@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from cipher.rsa import RSACipher
 from cipher.ecc import ECCipher
+
 app = Flask(__name__)
 
 # RSA CIPHER ALGORITHM
@@ -18,18 +19,10 @@ def rsa_encrypt():
     key_type = data["key_type"]
 
     private_key, public_key = rsa_cipher.load_keys()
-    
-    if key_type == "public":
-        key = public_key
-    elif key_type == "private":
-        key = private_key
-    else:
-        return jsonify({"error": "Invalid key type"})
-    
+    key = public_key if key_type == "public" else private_key
     encrypted_message = rsa_cipher.encrypt(message, key)
-    encrypted_hex = encrypted_message.hex()
 
-    return jsonify({"encrypted_message": encrypted_hex})
+    return jsonify({"encrypted_message": encrypted_message.hex()})
 
 @app.route("/api/rsa/decrypt", methods=["POST"])
 def rsa_decrypt():
@@ -38,16 +31,8 @@ def rsa_decrypt():
     key_type = data["key_type"]
 
     private_key, public_key = rsa_cipher.load_keys()
-    
-    if key_type == "public":
-                key = public_key
-    elif key_type == "private":
-        key = private_key
-    else:
-        return jsonify({"error": "Invalid key type"})
-
-    ciphertext = bytes.fromhex(ciphertext_hex)
-    decrypted_message = rsa_cipher.decrypt(ciphertext, key)
+    key = private_key if key_type == "private" else public_key
+    decrypted_message = rsa_cipher.decrypt(bytes.fromhex(ciphertext_hex), key)
 
     return jsonify({"decrypted_message": decrypted_message})
 
@@ -58,9 +43,8 @@ def rsa_sign_message():
 
     private_key, _ = rsa_cipher.load_keys()
     signature = rsa_cipher.sign(message, private_key)
-    signature_hex = signature.hex()
 
-    return jsonify({"signature": signature_hex})
+    return jsonify({"signature": signature.hex()})
 
 @app.route("/api/rsa/verify", methods=["POST"])
 def rsa_verify_signature():
@@ -69,11 +53,11 @@ def rsa_verify_signature():
     signature_hex = data["signature"]
 
     _, public_key = rsa_cipher.load_keys()
-    signature = bytes.fromhex(signature_hex)
-    is_verified = rsa_cipher.verify(message, signature, public_key)
+    is_verified = rsa_cipher.verify(message, bytes.fromhex(signature_hex), public_key)
 
     return jsonify({"is_verified": is_verified})
 
+# ECC CIPHER ALGORITHM
 ecc_cipher = ECCipher()
 
 @app.route('/api/ecc/generate_keys', methods=['GET'])
@@ -85,9 +69,9 @@ def ecc_generate_keys():
 def ecc_sign():
     data = request.json
     message = data['message']
-    private_key = ecc_cipher.load_keys()
-    signature = ecc_cipher.sign(message, private_key)
-    signature_hex = signature.hex()
+
+    signature_hex = ecc_cipher.sign(message)  # Trả về dạng hex
+
     return jsonify({'signature': signature_hex})
 
 @app.route('/api/ecc/verify', methods=['POST'])
@@ -95,12 +79,10 @@ def ecc_verify():
     data = request.json
     message = data['message']
     signature_hex = data['signature']
-    signature = bytes.fromhex(signature_hex)
-    public_key = ecc_cipher.load_keys()
-    is_verified = ecc_cipher.verify(message, signature, public_key)
+
+    is_verified = ecc_cipher.verify(message, signature_hex)
+    
     return jsonify({'is_verified': is_verified})
 
-
-# Main function
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
